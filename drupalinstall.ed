@@ -1,0 +1,94 @@
+#!/bin/bash
+
+#Check if settings file is exist
+file="/var/www/html/file_set.conf"
+if [ -f "$file" ]
+then
+     mv /var/www/html/file_set.conf /home/file_set.conf
+else
+     exit 1
+fi
+
+#Choosing settings from file
+for i in $(cat /home/file_set.conf)
+do
+         case $(echo ${i} | cut -d ":" -f 1) in
+                 user)
+                         user=`echo ${i} | cut -d ":" -f 2`
+                 ;;
+                 userpass)
+                         userpass=`echo ${i} | cut -d ":" -f 2`
+                 ;;
+                 drupaluser)
+                         drupaluser=`echo ${i} | cut -d ":" -f 2`
+                 ;;
+                 dbname)
+                         dbname=`echo ${i} | cut -d ":" -f 2`
+                 ;;
+         esac
+done
+echo "user="${user}, "userpass="${userpass}, "drupaluser="${drupaluser}, "dbname="${dbname} #>> /home/file_set.conf
+
+#Install drush
+
+     apt-get install drush -y
+     echo 1 | drush dl drush --destination='/usr/share' #Choosing release for drush
+
+# Apache configuration
+
+     rm -rf /etc/apache2/sites-available/*
+     touch /etc/apache2/sites-available/drupal.conf
+     cat >/etc/apache2/sites-available/drupal.conf <<EOL
+         <VirtualHost *:80>
+         DocumentRoot /var/www/html/drupal
+
+         <Directory /var/www/html/drupal>
+                 Options Indexes FollowSymLinks MultiViews
+                 AllowOverride All
+                 Require all granted
+         </Directory>
+
+         CustomLog /var/log/apache2/access.log combined
+         ErrorLog /var/log/apache2/error.log
+         LogLevel warn
+         </VirtualHost>
+
+EOL
+
+#cd /etc/apache2/conf-available/
+
+     cd /etc/apache2/sites-available/
+     a2ensite drupal.conf
+     rm /etc/apache2/sites-enabled/000-default.conf
+     service apache2 reload
+
+#Install Drupal
+
+     mkdir /var/www/html/drupal
+     drush dl --destination=/var/www/html/drupal #Download drupal
+     drupaldir=`ls -1 /var/www/html/drupal | grep drupal` #Check drupal version
+     mv /var/www/html/drupal/$drupaldir/* /var/www/html/drupal && mv /var/www/html/drupal/$drupaldir/.htaccess /var/www/html/drupal && rm -rf /var/www/html/drupal/$drupaldir/
+
+
+
+     /etc/init.d/apache2 restart
+
+#Configuration Drupal
+
+
+     dbuserpass=`tr -dc A-Za-z0-9 < /dev/urandom | head -c 8 | xargs` 
+#Generate randomize password for mysql user
+     echo "drupaldbpass:"$dbuserpass >> /home/file_set.conf
+     cp /var/www/html/drupal/sites/default/default.settings.php /var/www/html/drupal/sites/default/settings.php
+     chmod 664 /var/www/html/drupal/sites/default/settings.php
+#     chown -R www-data:www-data /var/www/
+#     chown -R www-data:www-data /var/www/html/drupal/.htaccess
+     cd /var/www/html/drupal
+     echo y | drush si standard --account-name=$user --account-pass=$userpass --db-su=root --db-url=mysql://$drupaluser:$dbuserpass@'localhost'/$dbname --site-name='Drupal Test Website'
+
+     a2enmod rewrite
+     /etc/init.d/apache2 restart
+     chown -R www-data:www-data /var/www/
+     sed -i '/install.sh/d' /etc/rc.local
+     sed -i '/www-data/d' /etc/sudoers
+     rm /var/www/html/index.php

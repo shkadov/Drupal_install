@@ -1,0 +1,67 @@
+<html>
+
+<br>
+
+<br>
+
+<h1>Enter Details Below:</h1>
+
+
+
+<form name="form1" action="" method="post">
+
+
+
+User Name: <br> <input type="text" name="user" size=20 maxlength="50"/><br>
+
+
+
+User password : <br> <input type="password" name="userpass" size=20 maxlength="50"><br>
+
+
+
+Drupal mysql name : <br> <input type="text" name="drupaluser" size=20 maxlength="50" /><br>
+
+
+
+Drupal mysql database name : <br> <input type="text" name="dbname" size=20 maxlength="50" /><br>
+
+<br>
+
+<input type="submit" value="Submit" />
+<input type="reset" value="Reset" />
+</form>
+
+
+
+
+
+<?php
+    if (isset($_POST) && !empty($_POST['user']) && !empty($_POST['userpass']) && !empty($_POST['drupaluser']) && !empty($_POST['dbname'])) {
+
+        $username = $_POST['user'];
+        $pass = $_POST['userpass'];
+        $drupaluser = $_POST['drupaluser'];
+        $dbname = $_POST['dbname'];
+
+        if (!empty($username) && !empty($pass) && !empty($drupaluser) && !empty($dbname)) {
+            $fp = fopen("/var/www/html/file_set.conf", "w");
+            fwrite($fp, 'user:' . $username . "\n");
+            fwrite($fp, 'userpass:' . $pass . "\n");
+            fwrite($fp, 'drupaluser:' . $drupaluser . "\n");
+            fwrite($fp, 'dbname:' . $dbname . "\n");
+            fclose($fp);
+        } else {
+            echo "Fields are empty";
+        }
+        $filename = '/var/www/html/file_set.conf';
+        if (filesize($filename) == 0) {
+            echo "File size =0";
+        } else {
+        exec ('sudo /sbin/reboot');
+#            echo filesize($filename);
+        }
+    }
+    ?>
+</html>
+
